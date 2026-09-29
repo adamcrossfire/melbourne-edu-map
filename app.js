@@ -6,7 +6,7 @@
   let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   root.setAttribute('data-theme', theme);
 
-  const state = { alpha: 1, gender: 'all', ptype: 2, budget: 99, grade: 'all', selected: null, layers: { areas: true, private: true, gov: false, selective: true } };
+  const state = { ver: 'v2', alpha: 1, gender: 'all', ptype: 2, budget: 99, grade: 'all', selected: null, layers: { areas: true, private: true, gov: false, selective: true } };
 
   // ---------- helpers
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -17,6 +17,7 @@
   const gradeOf = k => (privByKey[k] || {}).grade || '';
   const rest = a => a.eco + a.val + a.conv + a.rent + a.cat5;
   const score = a => {
+    if (state.ver === 'v1') return a.total1;
     const wp = 10 + 25 * state.alpha, wg = 40 - 25 * state.alpha;
     return +(rest(a) + a.p35 / 35 * wp + a.gov15 / 15 * wg).toFixed(1);
   };
@@ -105,6 +106,15 @@
     }
   });
 
+  const VN = { v1: '注重公立资源', v2: '注重私立资源' }, VS = { v1: '公立资源版', v2: '私立资源版' };
+  const POS = a => state.ver === 'v1' ? a.pos1 : a.pos;
+  function deltaTxt(a, rank) {
+    const other = state.ver === 'v1' ? a.rank2 : a.rank1, lab = state.ver === 'v1' ? VS.v2 : VS.v1;
+    const custom = state.ver === 'v2' && state.alpha !== 1;
+    const base = custom ? a.rank2 : other, blab = custom ? VS.v2 + '标准' : lab;
+    const d = base - rank;
+    return `<span class="delta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d === 0 ? '与' + blab + '同名次' : '较' + blab + (d > 0 ? '升 ' : '降 ') + Math.abs(d)}</span>`;
+  }
   // ---------- render
   function render() {
     const R = ranked();
@@ -143,9 +153,9 @@
         <div class="rank-no">${r.rank}</div>
         <div><div class="rank-name">${esc(a.name)}</div>
           <div class="rank-meta">${esc(near || '5 km 内无符合条件的私校')}</div>
-          <div class="rank-meta">${esc(a.pos)} · 入场约 ${e != null ? 'A$' + e.toFixed(2) + 'M' : '数据不足'}</div>
-          <div class="bar"><i style="width:${(a.p35 / 35 * 100).toFixed(0)}%"></i></div></div>
-        <div class="rank-score"><strong>${r.s}</strong>${state.alpha === 1 ? `<span class="delta ${a.rank1 - a.rank2 > 0 ? 'up' : a.rank1 - a.rank2 < 0 ? 'down' : ''}">${a.rank1 === a.rank2 ? '名次不变' : (a.rank1 > a.rank2 ? '较 v1 升 ' : '较 v1 降 ') + Math.abs(a.rank1 - a.rank2)}</span>` : `<span class="delta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d === 0 ? '同 v2' : (d > 0 ? '比 v2 升 ' : '比 v2 降 ') + Math.abs(d)}</span>`}</div>
+          <div class="rank-meta">${esc(POS(a))} · 入场约 ${e != null ? 'A$' + e.toFixed(2) + 'M' : '数据不足'}</div>
+          <div class="bar"><i style="width:${(state.ver === 'v1' ? a.gov25 / 25 : a.p35 / 35) * 100}%"></i></div></div>
+        <div class="rank-score"><strong>${r.s}</strong>${deltaTxt(a, r.rank)}</div>
       </li>`;
     }).join('');
     $$('.rank-item', list).forEach(li => {
@@ -156,7 +166,11 @@
     const top = R.filter(r => fits(r.a)).slice(0, 3).map(r => r.a.members[0]).join('、');
     $('#summary').textContent = `${nFit} / ${R.length} 个区域符合当前筛选${top ? '，前三：' + top : ''}`;
     const wp = Math.round(10 + 25 * state.alpha), wg = 50 - wp;
-    $('#wLabel').textContent = `私校距离 ${wp} 分 · 公校 ${wg} 分`;
+    $('#wLabel').textContent = state.alpha === 1 ? `标准权重：私校距离 ${wp} · 公校 ${wg}` : `自定义：私校距离 ${wp} · 公校 ${wg}`;
+    $('#weightBox').hidden = state.ver !== 'v2';
+    $('#v1Note').hidden = state.ver !== 'v1';
+    $$('.ver button').forEach(b => { b.classList.toggle('is-on', b.dataset.ver === state.ver); b.setAttribute('aria-pressed', b.dataset.ver === state.ver); });
+    $('#subTitle').textContent = VN[state.ver] + ' · 2026-09-29';
     if (state.selected) renderDetail(state.selected, byId);
   }
 
@@ -186,13 +200,13 @@
     }).join('');
     $('#detail').innerHTML = `
       <div class="d-head"><div>
-        <div class="d-kicker">当前排名第 ${r.rank} · v1 第 ${a.rank1} · v2 第 ${a.rank2}</div>
-        <h2 class="d-title">${esc(a.name)}</h2><span class="pos">${esc(a.pos)}</span></div>
+        <div class="d-kicker">${VN[state.ver]}第 ${r.rank}${state.ver === 'v2' && state.alpha !== 1 ? '（自定义权重）' : ''} · 注重公立资源第 ${a.rank1} · 注重私立资源第 ${a.rank2}</div>
+        <h2 class="d-title">${esc(a.name)}</h2><span class="pos">${esc(POS(a))}</span></div>
         <button class="close" id="dClose" aria-label="关闭"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
       <div class="d-score">
-        <div class="kpi"><span>当前权重得分</span><strong>${r.s}</strong></div>
-        <div class="kpi"><span>私校距离</span><strong>${a.p35}</strong><span>/35</span></div>
+        <div class="kpi"><span>${VN[state.ver]}得分</span><strong>${r.s}</strong></div>
+        ${state.ver === 'v1' ? `<div class="kpi"><span>公校学区</span><strong>${a.gov25}</strong><span>/25</span></div>` : `<div class="kpi"><span>私校距离</span><strong>${a.p35}</strong><span>/35</span></div>`}
         <div class="kpi"><span>5 km 内私校</span><strong>${a.n5}</strong><span>其中 A+ 以上 ${a.top5}</span></div>
       </div>
       <div class="d-sec"><h4>区域内外的学校（点击查看）</h4>
@@ -201,9 +215,10 @@
           return `<p class="sgrp">私立 / 天主教（需申请，住得近不算优先）</p>` + (S.priv.filter(it => schoolVisible(it.s)).map(it => row(it, it.s.grade + ' · ' + gch(it.s.gender), 'pri')).join('') || '<p class="hint">当前筛选下无</p>')
             + `<p class="sgrp">政府中学（常见学区对应，须门牌核验）</p>` + (S.gov.map(it => row(it, '公校 ' + (it.s.grade || ''), 'gov')).join('') || '<p class="hint">本区对应学校不在榜单内：' + esc(a.gov) + '</p>')
             + `<p class="sgrp">最近的选择性学校（考试入学，无学区）</p>` + S.sel.map(it => row(it, '选择性', 'sel')).join(''); })()}</div></div>
-      <div class="d-sec"><h4>评分拆解</h4></div>
-      ${subRow('质量加权距离', a.p_idx, 25, true)}${subRow('男/女校覆盖', a.p_gender, 5, true)}${subRow('最近 A+ 私校', a.p_near, 5, true)}
-      ${subRow('政府中学学区', a.gov15, 15)}${subRow('教育生态', a.eco, 10)}${subRow('房产保值', a.val, 20)}${subRow('生活通勤', a.conv, 10)}${subRow('租赁', a.rent, 5)}${subRow('催化剂与风险', a.cat5, 5)}
+      <div class="d-sec"><h4>评分拆解（${VN[state.ver]}）</h4></div>
+      ${state.ver === 'v1'
+        ? subRow('政府中学学区', a.gov25, 25, true) + subRow('私校可达性', a.pri20, 20, true) + subRow('教育生态', a.eco, 10) + subRow('房产保值', a.val, 20) + subRow('生活通勤', a.conv, 10) + subRow('租赁', a.rent, 5) + subRow('催化剂与风险', a.cat10, 10)
+        : subRow('质量加权距离', a.p_idx, 25, true) + subRow('男/女校覆盖', a.p_gender, 5, true) + subRow('最近 A+ 私校', a.p_near, 5, true) + subRow('政府中学学区', a.gov15, 15) + subRow('教育生态', a.eco, 10) + subRow('房产保值', a.val, 20) + subRow('生活通勤', a.conv, 10) + subRow('租赁', a.rent, 5) + subRow('催化剂与风险', a.cat5, 5)}
       <div class="d-sec"><h4>政府中学学区说明</h4><p>${esc(a.gov)}</p></div>
       <div class="d-sec"><h4>价格（2026 年 9 月）</h4>
         <div class="price"><div><b>House</b>${esc(a.house)}</div><div><b>Townhouse</b>${esc(a.th)}</div><div><b>Unit（2 房）</b>${esc(a.unit)}</div></div>
@@ -286,6 +301,7 @@
     state[n] = (n === 'budget' || n === 'ptype') ? +v : v;
     render();
   }));
+  $$('.ver button').forEach(b => b.addEventListener('click', () => { state.ver = b.dataset.ver; state.layers.gov = state.ver === 'v1'; $('#layerPop input[data-layer=gov]').checked = state.layers.gov; render(); }));
   $('#alpha').addEventListener('input', e => { state.alpha = +e.target.value / 100; render(); });
   $('#btnLayers').addEventListener('click', () => { const p = $('#layerPop'); p.hidden = !p.hidden; });
   $$('#layerPop input').forEach(i => i.addEventListener('change', () => { state.layers[i.dataset.layer] = i.checked; render(); }));

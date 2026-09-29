@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>墨尔本教育居住区地图｜私校距离优先版</title>
+<title>墨尔本教育居住区地图｜注重公立资源 / 注重私立资源</title>
 <meta name="description" content="墨尔本教育居住区排名、优秀私校距离、政府中学与选择性学校的互动地图（2026 年 9 月）">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +16,7 @@
 <header class="topbar">
   <a class="brand" href="#" aria-label="墨尔本教育居住区地图">
     <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" stroke="currentColor" stroke-width="2"/><path d="M8 21l8-11 8 11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="22" r="2.4" fill="var(--color-accent)"/></svg>
-    <span class="brand-text"><strong>墨尔本教育居住区</strong><small>私校距离优先版 · 2026-09-29</small></span>
+    <span class="brand-text"><strong>墨尔本教育居住区</strong><small id="subTitle">注重私立资源 · 2026-09-29</small></span>
   </a>
   <div class="top-actions">
     <button class="icon-btn" id="btnLayers" aria-label="图层">
@@ -29,6 +29,9 @@
 </header>
 
 <div id="map" role="region" aria-label="墨尔本教育居住区地图"></div>
+<div class="ver" role="group" aria-label="切换评分版本">
+  <button data-ver="v1" aria-pressed="false">注重公立资源</button><button data-ver="v2" class="is-on" aria-pressed="true">注重私立资源</button>
+</div>
 
 <div class="layer-pop" id="layerPop" hidden>
   <p class="pop-title">地图图层</p>
@@ -59,8 +62,9 @@
   </div>
   <div class="sheet-body">
     <div class="panel is-on" data-panel="rank">
-      <div class="weight">
-        <div class="weight-top"><span>公校优先</span><strong id="wLabel">私校距离 35 分 · 公校 15 分</strong><span>私校优先</span></div>
+      <p class="hint v1note" id="v1Note" hidden>当前为“注重公立资源”：政府中学学区 25 分、私校可达性 20 分，是第一版报告的排名。切到“注重私立资源”可按私校距离重排。</p>
+      <div class="weight" id="weightBox">
+        <div class="weight-top"><span>更看公校</span><strong id="wLabel">私校距离 35 分 · 公校 15 分</strong><span>更看私校</span></div>
         <input type="range" id="alpha" min="0" max="100" value="100" aria-label="私校距离与公校学区的权重">
       </div>
       <ol class="rank-list" id="rankList"></ol>
@@ -97,9 +101,40 @@
         <p><strong>签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。</strong></p>
         <p><strong>居住在学校附近仅改善通勤与教育生态，不构成录取保证；请按学校官网要求提前登记或申请。</strong></p>
       </div>
-      <h3>评分怎么来的</h3>
-      <p>区域总分 100：优秀私校距离 35（质量加权距离 25、男/女校覆盖 5、最近 A+ 私校 5）＋政府中学学区 15＋小学与教育生态 10＋房产保值 20＋生活通勤 10＋租赁 5＋催化剂与风险 5。拖动“排名”页的滑杆，可以把权重在“公校优先（私校 10 / 公校 40）”与“私校优先（35 / 15）”之间切换。</p>
-      <p>距离是 suburb 代表点到学校校区的直线距离（坐标来自 OpenStreetMap），不是早高峰车程；同一 suburb 内部可能相差 2–3 km。</p>
+      <h3>两套评分怎么来的</h3>
+      <p>地图顶部的两个按钮切换两套排名，着色、名次、列表和详情卡会一起变。两套用的是同一批学校、房价和区域数据，区别只在“公校和私校谁更重”。</p>
+      <div class="cmp">
+        <table>
+          <thead><tr><th>评分项（满分 100）</th><th>注重公立资源</th><th>注重私立资源</th></tr></thead>
+          <tbody>
+            <tr><td>政府中学学区</td><td><b>25</b></td><td>15</td></tr>
+            <tr><td>私立学校</td><td>20（可达性）</td><td><b>35</b>（距离）</td></tr>
+            <tr><td>小学与教育生态</td><td>10</td><td>10</td></tr>
+            <tr><td>房产保值与韧性</td><td>20</td><td>20</td></tr>
+            <tr><td>生活通勤</td><td>10</td><td>10</td></tr>
+            <tr><td>租赁</td><td>5</td><td>5</td></tr>
+            <tr><td>催化剂与风险</td><td>10</td><td>5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4 class="h4">注重公立资源（第一版）</h4>
+      <ul>
+        <li>核心问题：住在这里，孩子能不能进一所好的政府中学？</li>
+        <li>学区分 25：看常见对应中学的 VCE 表现（2022–2025 四年中位分与 40+ 比例）、学区边界稳定性、容量压力和学区内房价门槛。</li>
+        <li>私校可达性 20：研究判断分，看 15–20 分钟车程内有多少所好私校、男女校是否齐全，不逐校计算公里数。</li>
+        <li>适合：孩子大概率读公校，或选择性学校没把握、需要学区兜底的家庭。</li>
+      </ul>
+      <h4 class="h4">注重私立资源（第二版）</h4>
+      <ul>
+        <li>核心问题：离优秀私校有多近、男孩女孩是否都有好学校可选？</li>
+        <li>质量加权距离 25：学校越好权重越高（评分每高于 60 分加权），2 km 内算满，之后线性递减到 10 km 为零。</li>
+        <li>男/女校覆盖 5：5 km 内男生可读、女生可读的好私校各 ≥2 所得 2.5 分，只有 1 所得 1.5 分。</li>
+        <li>最近 A+ 私校 5：≤2 km 得 5，≤3.5 km 得 4，≤5 km 得 3，≤8 km 得 1.5。</li>
+        <li>政府学区分按第一版 ×0.6 折成 15 分；催化剂与风险按 ×0.5 折成 5 分。</li>
+        <li>适合：已确定走私校路线、更在意每天接送和通勤的家庭。</li>
+      </ul>
+      <p>在“注重私立资源”下，排名页的滑杆还可以继续微调：最右是标准权重（私校 35 / 公校 15），最左是私校 10 / 公校 40。最左并不等于“注重公立资源”，因为两边私校部分的算法不同。</p>
+      <p class="hint">距离是 suburb 代表点到学校校区的直线距离（坐标来自 OpenStreetMap），不是早高峰车程；同一 suburb 内部可能相差 2–3 km。两套都不影响录取：私校看登记与申请，公校看门牌地址对应的学区。</p>
       <h3>三件不能混为一谈的事</h3>
       <ul>
         <li>政府中学：按永久住址划学区，每年可能调整。</li>
