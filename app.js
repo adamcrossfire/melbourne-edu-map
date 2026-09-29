@@ -253,6 +253,7 @@
       flyOffset([s.lat, s.lon], 13);
     } else if (s.kind === 'gov') {
       flyOffset([s.lat, s.lon], 14);
+      L.marker([s.lat, s.lon], { icon: L.divIcon({ className: '', html: `<div class="focus gov"><i class="mk-gov">公</i><span>${esc(s.name)}</span></div>`, iconSize: null }), zIndexOffset: 3000 }).addTo(ringLayer);
       html = `<div class="d-kicker">政府中学 · 榜单 A 第 ${s.rank} · ${esc(s.grade)} 级 · ${s.score} 分</div>
         <h2 class="d-title">${esc(s.name)}</h2>
         <div class="d-sec"><p>主要学区覆盖（常见对应）：${esc(s.zone)}</p><p>VCE 中位分 2022→2025：${esc(s.median)}；2025 年 40+ 比例 ${s.p40}%</p><p>趋势：${esc(s.trend)}｜学区稳定性：${esc(s.stability)}｜学区风险：${esc(s.risk)}</p><p>适合：${esc(s.fam)}</p></div>
@@ -260,6 +261,7 @@
         <p class="warn">标记只表示学校位置，不代表学区边界。签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。</p>`;
     } else {
       flyOffset([s.lat, s.lon], 14);
+      L.marker([s.lat, s.lon], { icon: L.divIcon({ className: '', html: `<div class="focus sel"><i class="mk-sel">选</i><span>${esc(s.name)}</span></div>`, iconSize: null }), zIndexOffset: 3000 }).addTo(ringLayer);
       html = `<div class="d-kicker">选择性 / 特殊学校 · 没有学区</div>
         <h2 class="d-title">${esc(s.name)}</h2>
         <div class="d-sec"><p>${esc(s.note)}</p><p>四所选择性学校在 Year 8 统一考试招生，不按住址录取；John Monash Science School 为 Y10–12 自主选拔。住在附近只影响通勤。</p></div>
