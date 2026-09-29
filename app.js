@@ -71,6 +71,24 @@
   const govLayer = L.layerGroup();
   const selLayer = L.layerGroup().addTo(map);
   const ringLayer = L.layerGroup().addTo(map);
+  const focusLayer = L.layerGroup().addTo(map);
+  const hav = (a, b) => { const R = 6371, r = x => x * Math.PI / 180, dl = r(b.lat - a.lat), dn = r(b.lng - a.lng); const h = Math.sin(dl / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  const govBase = n => n.replace(/（女校）/, '').replace(/ (Secondary College|High School|College|P-12 College)$/, '');
+  const govSchools = D.schools.filter(s => s.kind === 'gov');
+  const areaSchools = a => {
+    const c = areaCentroid[a.id];
+    const priv = a.near.map(([k, km]) => {
+      const camps = D.schools.filter(s => s.kind === 'private' && s.key === k);
+      if (!camps.length) return null;
+      const s = camps.reduce((b, x) => hav(c, L.latLng(x.lat, x.lon)) < hav(c, L.latLng(b.lat, b.lon)) ? x : b);
+      return { s, km };
+    }).filter(Boolean);
+    const gov = govSchools.filter(s => new RegExp(govBase(s.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "(?=\\s|'|（|；|$|SC|High|College)").test(a.gov))
+      .map(s => ({ s, km: +hav(c, L.latLng(s.lat, s.lon)).toFixed(1) }));
+    const sel = D.schools.filter(s => s.kind === 'selective').map(s => ({ s, km: +hav(c, L.latLng(s.lat, s.lon)).toFixed(1) })).sort((x, y) => x.km - y.km).slice(0, 2);
+    return { priv, gov, sel };
+  };
+  let backArea = null;
 
   const gcls = g => g === 'S' ? 'g-S' : g === 'A+' ? 'g-A1' : 'g-A';
   const gch = g => g === '男校' ? '男' : g === '女校' ? '女' : '混';
@@ -108,7 +126,10 @@
         .on('click', () => selectArea(r.a.id, true)).addTo(pinLayer);
     });
     privLayer.clearLayers();
-    if (state.layers.private) privMarkers.forEach(({ s, m }) => { if (schoolVisible(s)) m.addTo(privLayer); });
+    const selA = state.selected ? D.areas.find(x => x.id === state.selected) : null;
+    const relKeys = selA ? new Set(selA.near.map(([k]) => k)) : null;
+    if (state.layers.private) privMarkers.forEach(({ s, m }) => { if (schoolVisible(s) && !(relKeys && relKeys.has(s.key))) { m.setOpacity(relKeys ? .3 : 1); m.addTo(privLayer); } });
+    drawFocus(selA);
     state.layers.gov ? govLayer.addTo(map) : govLayer.remove();
     state.layers.selective ? selLayer.addTo(map) : selLayer.remove();
 
@@ -139,6 +160,20 @@
     if (state.selected) renderDetail(state.selected, byId);
   }
 
+  function drawFocus(a) {
+    focusLayer.clearLayers();
+    if (!a) return;
+    const c = areaCentroid[a.id], S = areaSchools(a);
+    const add = (it, cls, html, lab = true) => {
+      L.polyline([c, [it.s.lat, it.s.lon]], { color: cls === 'gov' ? '#b5542d' : cls === 'sel' ? '#7a4fa3' : '#c9962b', weight: 2, opacity: .8, dashArray: '4 6', interactive: false }).addTo(focusLayer);
+      L.marker([it.s.lat, it.s.lon], { icon: L.divIcon({ className: '', html: `<div class="focus ${cls}">${html}${lab ? `<span>${esc(short(it.s.name.replace('（女校）', '')))} · ${it.km} km</span>` : ''}</div>`, iconSize: null }), zIndexOffset: 2000 })
+        .on('click', () => { backArea = a.id; showSchool(it.s, true); }).addTo(focusLayer);
+    };
+    S.priv.filter(it => schoolVisible(it.s)).forEach((it, i) => add(it, 'pri', `<i class="mk ${gcls(it.s.grade)}">${gch(it.s.gender)}</i>`, i < 3 || map.getZoom() >= 15));
+    S.gov.forEach(it => add(it, 'gov', '<i class="mk-gov">公</i>'));
+    S.sel.forEach((it, i) => add(it, 'sel', '<i class="mk-sel">选</i>', i === 0));
+  }
+
   // ---------- detail: area
   function subRow(label, v, max, acc) {
     return `<div class="sub"><span>${label}</span><span class="track"><i class="${acc ? 'acc' : ''}" style="width:${(v / max * 100).toFixed(0)}%"></i></span><em>${v}/${max}</em></div>`;
@@ -160,10 +195,16 @@
         <div class="kpi"><span>私校距离</span><strong>${a.p35}</strong><span>/35</span></div>
         <div class="kpi"><span>5 km 内私校</span><strong>${a.n5}</strong><span>其中 A+ 以上 ${a.top5}</span></div>
       </div>
+      <div class="d-sec"><h4>区域内外的学校（点击查看）</h4>
+        <p class="hint">地图已用虚线连到这些学校，距离为区域中心的直线距离。</p>
+        <div class="slist">${(() => { const S = areaSchools(a); const row = (it, tag, cls) => `<button class="srow" data-k="${esc(it.s.name)}"><span class="stag ${cls}">${tag}</span><span class="sname">${esc(it.s.name)}</span><span class="skm">${it.km} km</span></button>`;
+          return `<p class="sgrp">私立 / 天主教（需申请，住得近不算优先）</p>` + (S.priv.filter(it => schoolVisible(it.s)).map(it => row(it, it.s.grade + ' · ' + gch(it.s.gender), 'pri')).join('') || '<p class="hint">当前筛选下无</p>')
+            + `<p class="sgrp">政府中学（常见学区对应，须门牌核验）</p>` + (S.gov.map(it => row(it, '公校 ' + (it.s.grade || ''), 'gov')).join('') || '<p class="hint">本区对应学校不在榜单内：' + esc(a.gov) + '</p>')
+            + `<p class="sgrp">最近的选择性学校（考试入学，无学区）</p>` + S.sel.map(it => row(it, '选择性', 'sel')).join(''); })()}</div></div>
+      <div class="d-sec"><h4>评分拆解</h4></div>
       ${subRow('质量加权距离', a.p_idx, 25, true)}${subRow('男/女校覆盖', a.p_gender, 5, true)}${subRow('最近 A+ 私校', a.p_near, 5, true)}
       ${subRow('政府中学学区', a.gov15, 15)}${subRow('教育生态', a.eco, 10)}${subRow('房产保值', a.val, 20)}${subRow('生活通勤', a.conv, 10)}${subRow('租赁', a.rent, 5)}${subRow('催化剂与风险', a.cat5, 5)}
-      <div class="d-sec"><h4>最近的私校（直线距离，需申请）</h4><div class="chips">${near}</div></div>
-      <div class="d-sec"><h4>政府中学学区（常见对应）</h4><p>${esc(a.gov)}</p></div>
+      <div class="d-sec"><h4>政府中学学区说明</h4><p>${esc(a.gov)}</p></div>
       <div class="d-sec"><h4>价格（2026 年 9 月）</h4>
         <div class="price"><div><b>House</b>${esc(a.house)}</div><div><b>Townhouse</b>${esc(a.th)}</div><div><b>Unit（2 房）</b>${esc(a.unit)}</div></div>
         <p style="margin-top:8px">${esc(a.trend)}；租金 ${esc(a.rentTxt)}</p></div>
@@ -174,6 +215,7 @@
       <p class="warn">签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。居住在学校附近仅改善通勤与教育生态，不构成录取保证；请按学校官网要求提前登记或申请。</p>`;
     $('#detail').hidden = false;
     $('#dClose').onclick = closeDetail;
+    $$('.srow', $('#detail')).forEach(b => b.onclick = () => { const sc = D.schools.find(x => x.name === b.dataset.k); if (sc) { backArea = id; showSchool(sc, true); } });
   }
   function selectArea(id, fly) {
     state.selected = id; ringLayer.clearLayers();
@@ -181,16 +223,22 @@
     if (fly) {
       const layers = []; polyLayer.eachLayer(l => { if (suburbToArea[l.feature.properties.name].id === id) layers.push(l); });
       if (layers.length) {
-        const b = L.featureGroup(layers).getBounds();
+        const b = L.featureGroup(layers).getBounds(); const aa = D.areas.find(x => x.id === id);
+        areaSchools(aa).priv.filter(it => it.km <= 3.5).forEach(it => b.extend([it.s.lat, it.s.lon]));
         const mobile = innerWidth < 900;
-        map.flyToBounds(b, { paddingTopLeft: [mobile ? 20 : 440, 20], paddingBottomRight: [mobile ? 20 : 440, mobile ? innerHeight * .55 : 20], maxZoom: 14, duration: .6 });
+        map.flyToBounds(b, { paddingTopLeft: [mobile ? 20 : 440, 20], paddingBottomRight: [mobile ? 20 : 440, mobile ? innerHeight * .55 : 20], maxZoom: 13, duration: .6 });
       }
     }
   }
   function closeDetail() { $('#detail').hidden = true; state.selected = null; ringLayer.clearLayers(); render(); }
 
   // ---------- detail: school
-  function showSchool(s) {
+  function flyOffset(ll, z) {
+    const mob = innerWidth < 900, p = map.project(L.latLng(ll), z).add([mob ? 0 : -0, mob ? innerHeight * .28 : 0]);
+    map.flyTo(map.unproject(p, z), z, { duration: .5 });
+  }
+  function showSchool(s, fromArea) {
+    if (!fromArea) backArea = null;
     state.selected = null; render(); ringLayer.clearLayers();
     let html = '';
     if (s.kind === 'private') {
@@ -202,21 +250,25 @@
         <div class="d-sec"><p>${esc(s.type)}｜${esc(s.loc)}</p><p>VCE 中位分 2022→2025：${esc(s.median)}</p><p>招生难度：${esc(s.diff)}</p><p>学费（2026，Y7–Y12）：${esc(s.fee)}</p><p>提示：${esc(s.note)}</p></div>
         <div class="d-sec"><h4>5 km 内的推荐区域</h4><p>${esc(inside.join('、') || '本报告区域均不在 5 km 内')}</p><p class="hint">地图上的实线圈为 3 km，虚线圈为 5 km（直线距离）。</p></div>
         <p class="warn">居住在学校附近仅改善通勤与教育生态，不构成录取保证；请按学校官网要求提前登记或申请。</p>`;
-      map.flyTo([s.lat, s.lon], 13, { duration: .5 });
+      flyOffset([s.lat, s.lon], 13);
     } else if (s.kind === 'gov') {
+      flyOffset([s.lat, s.lon], 14);
       html = `<div class="d-kicker">政府中学 · 榜单 A 第 ${s.rank} · ${esc(s.grade)} 级 · ${s.score} 分</div>
         <h2 class="d-title">${esc(s.name)}</h2>
         <div class="d-sec"><p>主要学区覆盖（常见对应）：${esc(s.zone)}</p><p>VCE 中位分 2022→2025：${esc(s.median)}；2025 年 40+ 比例 ${s.p40}%</p><p>趋势：${esc(s.trend)}｜学区稳定性：${esc(s.stability)}｜学区风险：${esc(s.risk)}</p><p>适合：${esc(s.fam)}</p></div>
         <a class="btn solid" href="https://www.findmyschool.vic.gov.au/" target="_blank" rel="noopener">在 Find my School 查看学区边界</a>
         <p class="warn">标记只表示学校位置，不代表学区边界。签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。</p>`;
     } else {
+      flyOffset([s.lat, s.lon], 14);
       html = `<div class="d-kicker">选择性 / 特殊学校 · 没有学区</div>
         <h2 class="d-title">${esc(s.name)}</h2>
         <div class="d-sec"><p>${esc(s.note)}</p><p>四所选择性学校在 Year 8 统一考试招生，不按住址录取；John Monash Science School 为 Y10–12 自主选拔。住在附近只影响通勤。</p></div>
         <a class="btn" href="https://www.vic.gov.au/selective-entry-high-schools" target="_blank" rel="noopener">查看官方招生说明</a>`;
     }
+    if (backArea) html = `<button class="back" id="dBack">← 返回 ${esc(D.areas.find(x => x.id === backArea).name)}</button>` + html;
     $('#detail').innerHTML = `<div class="d-head"><div>${html}</div><button class="close" id="dClose" aria-label="关闭"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>`;
     $('#detail').hidden = false; $('#dClose').onclick = closeDetail;
+    if ($('#dBack')) $('#dBack').onclick = () => { const id = backArea; backArea = null; selectArea(id, true); };
   }
 
   // ---------- controls
