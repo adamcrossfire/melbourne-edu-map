@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>墨尔本教育居住区地图｜私校距离优先版</title>
+<meta name="description" content="墨尔本教育居住区排名、优秀私校距离、政府中学与选择性学校的互动地图（2026 年 9 月）">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="./style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f3a5f'/%3E%3Cpath d='M8 21l8-11 8 11' stroke='%23e9c46a' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='22' r='2.5' fill='%23e9c46a'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" aria-label="墨尔本教育居住区地图">
+    <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" stroke="currentColor" stroke-width="2"/><path d="M8 21l8-11 8 11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="22" r="2.4" fill="var(--color-accent)"/></svg>
+    <span class="brand-text"><strong>墨尔本教育居住区</strong><small>私校距离优先版 · 2026-09-29</small></span>
+  </a>
+  <div class="top-actions">
+    <button class="icon-btn" id="btnLayers" aria-label="图层">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+    </button>
+    <button class="icon-btn" id="btnTheme" aria-label="切换深浅色">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div id="map" role="region" aria-label="墨尔本教育居住区地图"></div>
+
+<div class="layer-pop" id="layerPop" hidden>
+  <p class="pop-title">地图图层</p>
+  <label><input type="checkbox" data-layer="areas" checked> 区域评分（按 suburb 着色）</label>
+  <label><input type="checkbox" data-layer="private" checked> 私立与天主教学校</label>
+  <label><input type="checkbox" data-layer="gov"> 政府中学（位置，不代表学区边界）</label>
+  <label><input type="checkbox" data-layer="selective" checked> 选择性 / 特殊学校（无学区）</label>
+  <div class="legend">
+    <p class="pop-title">区域得分</p>
+    <div class="legend-bar"></div>
+    <div class="legend-labels"><span>低</span><span>高</span></div>
+    <p class="pop-title">学校标记</p>
+    <div class="legend-row">私校颜色：<span class="dot g-S"></span>S <span class="dot g-A1"></span>A+ <span class="dot g-A"></span>A 及以下</div>
+    <div class="legend-row">圆点内文字：男＝男校，女＝女校，混＝混校</div>
+    <div class="legend-row"><span class="sq">公</span>政府中学 <span class="star">选</span>选择性学校</div>
+  </div>
+</div>
+
+<section class="sheet" id="sheet" data-state="peek" aria-label="排名与筛选">
+  <button class="grab" id="grab" aria-label="展开或收起面板"><span></span></button>
+  <div class="sheet-head">
+    <div class="tabs" role="tablist">
+      <button role="tab" class="tab is-on" data-tab="rank" aria-selected="true">排名</button>
+      <button role="tab" class="tab" data-tab="filter" aria-selected="false">筛选</button>
+      <button role="tab" class="tab" data-tab="about" aria-selected="false">说明</button>
+    </div>
+    <div class="summary" id="summary"></div>
+  </div>
+  <div class="sheet-body">
+    <div class="panel is-on" data-panel="rank">
+      <div class="weight">
+        <div class="weight-top"><span>公校优先</span><strong id="wLabel">私校距离 35 分 · 公校 15 分</strong><span>私校优先</span></div>
+        <input type="range" id="alpha" min="0" max="100" value="100" aria-label="私校距离与公校学区的权重">
+      </div>
+      <ol class="rank-list" id="rankList"></ol>
+    </div>
+    <div class="panel" data-panel="filter">
+      <fieldset>
+        <legend>孩子性别（影响显示哪些私校）</legend>
+        <div class="seg" data-name="gender">
+          <button class="is-on" data-v="all">不限</button><button data-v="boy">男孩</button><button data-v="girl">女孩</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>房型</legend>
+        <div class="seg" data-name="ptype">
+          <button class="is-on" data-v="2">House（3 房）</button><button data-v="1">Townhouse</button><button data-v="0">Unit（2 房）</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>预算（总价，AUD）</legend>
+        <div class="seg wrap" data-name="budget">
+          <button class="is-on" data-v="99">不限</button><button data-v="1.0">1.0M 以下</button><button data-v="1.4">1.4M 以下</button><button data-v="1.8">1.8M 以下</button><button data-v="2.5">2.5M 以下</button>
+        </div>
+        <p class="hint">入场价参考 Domain 近 12 个月按房间数成交中位价；超出预算的区域在地图和列表中变淡。</p>
+      </fieldset>
+      <fieldset>
+        <legend>私校等级</legend>
+        <div class="seg" data-name="grade">
+          <button class="is-on" data-v="all">全部</button><button data-v="A+">A+ 及以上</button><button data-v="S">仅 S 级</button>
+        </div>
+      </fieldset>
+    </div>
+    <div class="panel" data-panel="about">
+      <div class="notice">
+        <p><strong>签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。</strong></p>
+        <p><strong>居住在学校附近仅改善通勤与教育生态，不构成录取保证；请按学校官网要求提前登记或申请。</strong></p>
+      </div>
+      <h3>评分怎么来的</h3>
+      <p>区域总分 100：优秀私校距离 35（质量加权距离 25、男/女校覆盖 5、最近 A+ 私校 5）＋政府中学学区 15＋小学与教育生态 10＋房产保值 20＋生活通勤 10＋租赁 5＋催化剂与风险 5。拖动“排名”页的滑杆，可以把权重在“公校优先（私校 10 / 公校 40）”与“私校优先（35 / 15）”之间切换。</p>
+      <p>距离是 suburb 代表点到学校校区的直线距离（坐标来自 OpenStreetMap），不是早高峰车程；同一 suburb 内部可能相差 2–3 km。</p>
+      <h3>三件不能混为一谈的事</h3>
+      <ul>
+        <li>政府中学：按永久住址划学区，每年可能调整。</li>
+        <li>私立与天主教学校：看提前登记、申请日期、面试、兄弟姐妹、宗教或教区，住得近不算优先。</li>
+        <li>选择性学校（Mac.Rob、Melbourne High、Nossal、Suzanne Cory）：Year 8 统一考试，没有学区。</li>
+      </ul>
+      <h3>主要数据</h3>
+      <ul class="src">
+        <li><a href="https://www.findmyschool.vic.gov.au/" target="_blank" rel="noopener">Find my School</a>、<a href="https://www.vic.gov.au/school-zones" target="_blank" rel="noopener">Victorian Government：School zones</a></li>
+        <li><a href="https://www.vic.gov.au/selective-entry-high-schools" target="_blank" rel="noopener">Selective entry high schools</a></li>
+        <li>VCE 2022–2025：<a href="https://www.schoolexplorer.com.au/rankings" target="_blank" rel="noopener">School Explorer</a>、<a href="https://www.auguide.com.au/en/blog/top-50-vce-schools-victoria-2025/" target="_blank" rel="noopener">AU Guide</a></li>
+        <li>私校学费：<a href="https://compareprivateschools.com.au/private-school-fees/melbourne/" target="_blank" rel="noopener">Compare Private Schools</a> 及各校官网</li>
+        <li>房价租金：<a href="https://www.property.com.au/" target="_blank" rel="noopener">property.com.au（PropTrack）</a>、<a href="https://www.domain.com.au/suburb-profile/" target="_blank" rel="noopener">Domain</a>、<a href="https://www.onthehouse.com.au/" target="_blank" rel="noopener">OnTheHouse</a>（2026 年 9 月读取）</li>
+        <li>大盘：<a href="https://discover.cotality.com/hubfs/Article-Reports/COTALITY%20HVI%20SEP%202026%20FINAL%20(1).pdf" target="_blank" rel="noopener">Cotality HVI（截至 2026-08-31）</a>；利率：<a href="https://www.rba.gov.au/media-releases/2026/mr-26-27.html" target="_blank" rel="noopener">RBA 9 月 29 日加息至 4.60%</a></li>
+        <li>学区溢价：<a href="https://www.theage.com.au/property/news/how-much-it-costs-to-live-in-melbourne-s-most-desired-school-zones-20260818-p60pgz.html" target="_blank" rel="noopener">The Age / Cotality</a></li>
+        <li>边界：<a href="https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3" target="_blank" rel="noopener">ABS Suburbs and Localities 2021</a>；坐标：<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></li>
+      </ul>
+      <p class="fine">评分为研究模型的判断性评分，不是官方排名，也不构成法律、税务或金融建议。</p>
+    </div>
+  </div>
+</section>
+
+<section class="detail" id="detail" hidden aria-live="polite"></section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./data.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
