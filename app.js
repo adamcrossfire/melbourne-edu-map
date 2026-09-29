@@ -44,9 +44,9 @@
   };
 
   // ---------- map
-  const map = L.map('map', { zoomControl: true, attributionControl: true, preferCanvas: false }).setView([-37.86, 145.06], 11);
+  const map = L.map('map', { zoomControl: false, attributionControl: true, preferCanvas: false, minZoom: 9, maxZoom: 18, zoomSnap: .5, zoomDelta: 1, wheelPxPerZoomLevel: 90, touchZoom: true, doubleClickZoom: true, scrollWheelZoom: true, boxZoom: true, bounceAtZoomLimits: false, maxBounds: [[-38.6, 144.2], [-37.3, 145.9]] }).setView([-37.86, 145.06], 11);
   const tileUrl = t => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${t === 'dark' ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base'}/MapServer/tile/{z}/{y}/{x}`;
-  const tiles = L.tileLayer(tileUrl(theme), { maxZoom: 16, attribution: '底图 &copy; Esri · 学校坐标 &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · 边界 ABS SAL 2021' }).addTo(map);
+  const tiles = L.tileLayer(tileUrl(theme), { maxZoom: 18, maxNativeZoom: 16, attribution: '底图 &copy; Esri · 学校坐标 &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · 边界 ABS SAL 2021' }).addTo(map);
 
   const suburbToArea = {};
   D.areas.forEach(a => a.members.forEach(m => suburbToArea[m] = a));
@@ -308,6 +308,17 @@
     e.preventDefault();
   });
 
+  const ZC = L.Control.extend({ options: { position: 'topright' }, onAdd() {
+    const d = L.DomUtil.create('div', 'zc');
+    d.innerHTML = `<button data-z="in" aria-label="放大">+</button><button data-z="out" aria-label="缩小">−</button><button data-z="all" aria-label="显示全部区域" title="显示全部区域"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><span class="zl" aria-live="polite"></span>`;
+    L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+    d.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.z === 'in') map.zoomIn(); else if (b.dataset.z === 'out') map.zoomOut();
+      else map.flyToBounds(polyLayer.getBounds(), { paddingTopLeft: [innerWidth < 900 ? 10 : 420, 10], paddingBottomRight: [10, innerWidth < 900 ? 200 : 10], duration: .6 }); });
+    const upd = () => { d.querySelector('.zl').textContent = 'Z' + map.getZoom().toFixed(1).replace('.0', ''); d.querySelector('[data-z=in]').disabled = map.getZoom() >= map.getMaxZoom(); d.querySelector('[data-z=out]').disabled = map.getZoom() <= map.getMinZoom(); };
+    map.on('zoomend', upd); setTimeout(upd); return d;
+  } });
+  new ZC().addTo(map);
   const mob = innerWidth < 900;
   map.setView(mob ? [-37.855, 145.06] : [-37.86, 145.02], mob ? 12 : 12);
   map.on('zoomend', () => { document.body.classList.toggle('z-low', map.getZoom() < 13); render(); });
