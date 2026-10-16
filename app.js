@@ -363,7 +363,7 @@
       });
     }
     state.layers.mainroads ? badLayer.addTo(map) : badLayer.remove();
-    const subs = ['Camberwell', 'Balwyn', 'Balwyn North'];
+    const subs = ['Camberwell', 'Balwyn', 'Balwyn North', 'Glen Iris', 'Canterbury'];
     const list = $('#stList'); if (!list) return;
     list.innerHTML = subs.filter(sb => state.stsub === 'all' || state.stsub === sb).map(sb => {
       const items = stObjs.filter(o => o.g.sub === sb).sort((x, y) => (x.g.kind === 'precinct' ? -1 : 0) - (y.g.kind === 'precinct' ? -1 : 0) || (y.g.rating || 0) - (x.g.rating || 0));
@@ -372,8 +372,8 @@
     $$('.st-row', list).forEach(b => b.onclick = () => showStreet(+b.dataset.i, true));
     const est = ST.estates.filter(e => state.stsub === 'all' || state.stsub === e[1]);
     $('#stFoot').innerHTML = (est.length ? `<p class="sgrp">没有公开边界、未在地图上画出的片区</p><ul>${est.map(e => `<li><b>${esc(e[0])}</b>（${esc(e[1])}）：${esc(e[2])}。来源：<a href="${ST.src[e[3]][1]}" target="_blank" rel="noopener">${esc(ST.src[e[3]][0])}</a></li>`).join('')}</ul>` : '')
-      + `<p class="sgrp">红色虚线：主干道临街</p><p class="hint">Burke、Riversdale、Toorak、Camberwell、Whitehorse、Belmore、Balwyn、Doncaster Road。${esc(ST.bad_note)}（<a href="${ST.src.lp[1]}" target="_blank" rel="noopener">LP Advisory</a>）</p>
-      <p class="hint">Homely 评分来自居民自愿留评，每条街样本量可能很小，适合缩小范围，不能当定论。街道线条来自 Victorian Government Vicmap Transport 道路数据。Golden Mile 只画了 Mont Albert Road 在 Burke Road 与 Balwyn Road 之间的一段。</p>
+      + `<p class="sgrp">红色虚线：主干道临街</p><p class="hint">Burke、Riversdale、Toorak、Camberwell、Whitehorse、Belmore、Balwyn、Doncaster、Canterbury Road 以及 Glen Iris 的 High Street。${esc(ST.bad_note)}（<a href="${ST.src.lp[1]}" target="_blank" rel="noopener">LP Advisory</a>）</p>
+      <p class="hint">Homely 评分来自居民自愿留评，每条街样本量可能很小，适合缩小范围，不能当定论。街道线条来自 Victorian Government Vicmap Transport 道路数据。Golden Mile 只画了 Mont Albert Road 在 Burke Road 与 Balwyn Road 之间的一段，这段路北侧属 Balwyn、南侧属 Canterbury。Maling Road 临商业街一段较热闹，安静程度不如周边住宅街。</p>
       <p class="hint"><b>签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。</b>同一条街两侧可能属于不同学区。</p>`;
   }
   function showStreet(i, fly) {
