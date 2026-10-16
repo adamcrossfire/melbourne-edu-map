@@ -200,3 +200,4 @@ legend{font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-2)}
 .st-intro{margin:0}
 .st-foot ul{padding-left:1.1em}.st-foot li{font-size:var(--text-sm);line-height:1.6;margin-bottom:4px}
 [data-theme="dark"] .st-tag b{color:#5fd3ad}
+.st-row{width:100%;margin-bottom:6px}
