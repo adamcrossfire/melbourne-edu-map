@@ -39,6 +39,8 @@
   <label><input type="checkbox" data-layer="private" checked> 私立与天主教学校</label>
   <label><input type="checkbox" data-layer="gov"> 政府中学（位置，不代表学区边界）</label>
   <label><input type="checkbox" data-layer="selective" checked> 选择性 / 特殊学校（无学区）</label>
+  <label><input type="checkbox" data-layer="streets" checked> 口碑街道（Camberwell / Balwyn / Balwyn North）</label>
+  <label><input type="checkbox" data-layer="mainroads" checked> 主干道临街（通常折价）</label>
   <div class="legend">
     <p class="pop-title">区域得分</p>
     <div class="legend-bar"></div>
@@ -47,6 +49,8 @@
     <div class="legend-row">私校颜色：<span class="dot g-S"></span>S <span class="dot g-A1"></span>A+ <span class="dot g-A"></span>A 及以下</div>
     <div class="legend-row">圆点内文字：男＝男校，女＝女校，混＝混校</div>
     <div class="legend-row"><span class="sq">公</span>政府中学 <span class="star">选</span>选择性学校</div>
+    <p class="pop-title">街道</p>
+    <div class="legend-row"><span class="ln ln-p"></span>口碑片区 <span class="ln ln-s"></span>口碑街道 <span class="ln ln-b"></span>主干道</div>
   </div>
 </div>
 
@@ -55,6 +59,7 @@
   <div class="sheet-head">
     <div class="tabs" role="tablist">
       <button role="tab" class="tab is-on" data-tab="rank" aria-selected="true">排名</button>
+      <button role="tab" class="tab" data-tab="streets" aria-selected="false">街道</button>
       <button role="tab" class="tab" data-tab="filter" aria-selected="false">筛选</button>
       <button role="tab" class="tab" data-tab="about" aria-selected="false">说明</button>
     </div>
@@ -68,6 +73,15 @@
         <input type="range" id="alpha" min="0" max="100" value="100" aria-label="私校距离与公校学区的权重">
       </div>
       <ol class="rank-list" id="rankList"></ol>
+    </div>
+    <div class="panel" data-panel="streets">
+      <p class="hint st-intro">Camberwell、Balwyn、Balwyn North 口碑较好的街道和片区，来自 Homely 居民评分（满分 5）、Domain 社区报道和本地中介介绍。点一条街，地图会飞过去并高亮。</p>
+      <div class="seg st-seg" data-name="stsub">
+        <button class="is-on" data-v="all">全部</button><button data-v="Camberwell">Camberwell</button><button data-v="Balwyn">Balwyn</button><button data-v="Balwyn North">Balwyn North</button>
+      </div>
+      <button class="btn" id="stFit">在地图上显示全部口碑街道</button>
+      <div id="stList"></div>
+      <div class="st-foot" id="stFoot"></div>
     </div>
     <div class="panel" data-panel="filter">
       <fieldset>
@@ -150,6 +164,7 @@
         <li>房价租金：<a href="https://www.property.com.au/" target="_blank" rel="noopener">property.com.au（PropTrack）</a>、<a href="https://www.domain.com.au/suburb-profile/" target="_blank" rel="noopener">Domain</a>、<a href="https://www.onthehouse.com.au/" target="_blank" rel="noopener">OnTheHouse</a>（2026 年 9 月读取）</li>
         <li>大盘：<a href="https://discover.cotality.com/hubfs/Article-Reports/COTALITY%20HVI%20SEP%202026%20FINAL%20(1).pdf" target="_blank" rel="noopener">Cotality HVI（截至 2026-08-31）</a>；利率：<a href="https://www.rba.gov.au/media-releases/2026/mr-26-27.html" target="_blank" rel="noopener">RBA 9 月 29 日加息至 4.60%</a></li>
         <li>学区溢价：<a href="https://www.theage.com.au/property/news/how-much-it-costs-to-live-in-melbourne-s-most-desired-school-zones-20260818-p60pgz.html" target="_blank" rel="noopener">The Age / Cotality</a></li>
+        <li>口碑街道：<a href="https://www.homely.com.au/suburb-profile/balwyn-vic-3103" target="_blank" rel="noopener">Homely 居民评分</a>、<a href="https://www.domain.com.au/news/neighbourhoods-camberwell-20150917-gjjbqv/" target="_blank" rel="noopener">Domain</a>、<a href="https://noeljones.com.au/suburbs/balwyn/" target="_blank" rel="noopener">Noel Jones</a>、<a href="https://lpadvisory.com.au/locations/buyers-agent-camberwell/" target="_blank" rel="noopener">LP Advisory</a>；街道线条：<a href="https://discover.data.vic.gov.au/dataset/vicmap-transport-road-line" target="_blank" rel="noopener">Vicmap Transport</a></li>
         <li>边界：<a href="https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3" target="_blank" rel="noopener">ABS Suburbs and Localities 2021</a>；坐标：<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></li>
       </ul>
       <p class="fine">评分为研究模型的判断性评分，不是官方排名，也不构成法律、税务或金融建议。</p>
@@ -161,6 +176,7 @@
 
 <script src="./vendor/leaflet/leaflet.js"></script>
 <script src="./data.js"></script>
+<script src="./streets.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

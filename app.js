@@ -6,7 +6,7 @@
   let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   root.setAttribute('data-theme', theme);
 
-  const state = { ver: 'v2', alpha: 1, gender: 'all', ptype: 2, budget: 99, grade: 'all', selected: null, layers: { areas: true, private: true, gov: false, selective: true } };
+  const state = { ver: 'v2', alpha: 1, gender: 'all', ptype: 2, budget: 99, grade: 'all', selected: null, layers: { areas: true, private: true, gov: false, selective: true, streets: true, mainroads: true }, stsub: 'all' };
 
   // ---------- helpers
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -123,7 +123,7 @@
     polyLayer.eachLayer(l => {
       const a = suburbToArea[l.feature.properties.name]; const r = byId[a.id]; const ok = fits(a);
       const sel = state.selected === a.id;
-      l.setStyle({ fillColor: colorFor(R.length - r.rank, 0, R.length - 1), fillOpacity: state.layers.areas ? (ok ? (sel ? .8 : .58) : .12) : 0, color: sel ? '#c9962b' : (theme === 'dark' ? '#12161d' : '#ffffff'), weight: sel ? 3 : 1, opacity: state.layers.areas ? 1 : 0 });
+      l.setStyle({ fillColor: colorFor(R.length - r.rank, 0, R.length - 1), fillOpacity: state.layers.areas ? (ok ? (sel ? (map.getZoom() >= 14 ? .35 : .8) : (map.getZoom() >= 14 ? .25 : .58)) : .12) : 0, color: sel ? '#c9962b' : (theme === 'dark' ? '#12161d' : '#ffffff'), weight: sel ? 3 : 1, opacity: state.layers.areas ? 1 : 0 });
       if (sel) l.bringToFront();
     });
     pinLayer.clearLayers();
@@ -335,6 +335,74 @@
     map.on('zoomend', upd); setTimeout(upd); return d;
   } });
   new ZC().addTo(map);
+
+  // ---------- 口碑街道
+  const ST = window.STREETS || { good: [], bad: [], src: {}, estates: [] };
+  map.createPane('stHiPane'); map.getPane('stHiPane').style.zIndex = 450; map.getPane('stHiPane').style.pointerEvents = 'none';
+  const stLayer = L.layerGroup().addTo(map), badLayer = L.layerGroup().addTo(map), stLabel = L.layerGroup().addTo(map), stHi = L.layerGroup().addTo(map);
+  const toLL = l => l.map(([x, y]) => [y, x]);
+  const stCol = k => k === 'precinct' ? '#0b7a5e' : '#16a37f';
+  const stObjs = ST.good.map((g, i) => {
+    const casing = L.polyline(g.lines.map(toLL), { color: '#ffffff', weight: g.kind === 'precinct' ? 11 : 8, opacity: .9, interactive: false });
+    const line = L.polyline(g.lines.map(toLL), { color: stCol(g.kind), weight: g.kind === 'precinct' ? 7 : 5, opacity: .95, lineCap: 'round' });
+    line.bindTooltip(`${g.name}${g.rating ? ' · ' + g.rating : ''}`, { sticky: true, direction: 'top', opacity: .95 });
+    line.on('click', e => { L.DomEvent.stopPropagation(e); showStreet(i, false); });
+    const b = line.getBounds();
+    return { g, i, casing, line, b };
+  });
+  ST.bad.forEach(r => L.polyline(r.lines.map(toLL), { color: '#c0392b', weight: 4, opacity: .75, dashArray: '2 8', lineCap: 'round' })
+    .bindTooltip(`${r.name}：主干道临街，通常折价`, { sticky: true }).addTo(badLayer));
+  function stVisible(o) { return state.stsub === 'all' || o.g.sub === state.stsub; }
+  function renderStreets() {
+    stLayer.clearLayers(); stLabel.clearLayers();
+    if (state.layers.streets) {
+      const z = map.getZoom();
+      stObjs.filter(stVisible).forEach(o => {
+        o.casing.addTo(stLayer); o.line.addTo(stLayer);
+        if (z >= 14) L.marker(o.b.getCenter(), { icon: L.divIcon({ className: '', html: `<div class="st-tag ${o.g.kind}">${esc(o.g.name)}${o.g.rating ? ' <b>' + o.g.rating + '</b>' : ''}</div>`, iconSize: null }), interactive: false, keyboard: false }).addTo(stLabel);
+      });
+    }
+    state.layers.mainroads ? badLayer.addTo(map) : badLayer.remove();
+    const subs = ['Camberwell', 'Balwyn', 'Balwyn North'];
+    const list = $('#stList'); if (!list) return;
+    list.innerHTML = subs.filter(sb => state.stsub === 'all' || state.stsub === sb).map(sb => {
+      const items = stObjs.filter(o => o.g.sub === sb).sort((x, y) => (x.g.kind === 'precinct' ? -1 : 0) - (y.g.kind === 'precinct' ? -1 : 0) || (y.g.rating || 0) - (x.g.rating || 0));
+      return `<p class="sgrp">${sb}</p>` + items.map(o => `<button class="srow st-row" data-i="${o.i}"><span class="stag ${o.g.kind === 'precinct' ? 'stp' : 'sts'}">${o.g.kind === 'precinct' ? '片区' : '街道'}</span><span class="sname">${esc(o.g.name)}<small>${esc(o.g.note)}</small></span><span class="skm">${o.g.rating ? '★ ' + o.g.rating : ''}</span></button>`).join('');
+    }).join('');
+    $$('.st-row', list).forEach(b => b.onclick = () => showStreet(+b.dataset.i, true));
+    const est = ST.estates.filter(e => state.stsub === 'all' || state.stsub === e[1]);
+    $('#stFoot').innerHTML = (est.length ? `<p class="sgrp">没有公开边界、未在地图上画出的片区</p><ul>${est.map(e => `<li><b>${esc(e[0])}</b>（${esc(e[1])}）：${esc(e[2])}。来源：<a href="${ST.src[e[3]][1]}" target="_blank" rel="noopener">${esc(ST.src[e[3]][0])}</a></li>`).join('')}</ul>` : '')
+      + `<p class="sgrp">红色虚线：主干道临街</p><p class="hint">Burke、Riversdale、Toorak、Camberwell、Whitehorse、Belmore、Balwyn、Doncaster Road。${esc(ST.bad_note)}（<a href="${ST.src.lp[1]}" target="_blank" rel="noopener">LP Advisory</a>）</p>
+      <p class="hint">Homely 评分来自居民自愿留评，每条街样本量可能很小，适合缩小范围，不能当定论。街道线条来自 Victorian Government Vicmap Transport 道路数据。Golden Mile 只画了 Mont Albert Road 在 Burke Road 与 Balwyn Road 之间的一段。</p>
+      <p class="hint"><b>签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。</b>同一条街两侧可能属于不同学区。</p>`;
+  }
+  function showStreet(i, fly) {
+    const o = stObjs[i], g = o.g; backArea = null; state.selected = null; ringLayer.clearLayers(); render();
+    stHi.clearLayers();
+    L.polyline(g.lines.map(toLL), { pane: 'stHiPane', color: '#c9962b', weight: g.kind === 'precinct' ? 16 : 14, opacity: .6, interactive: false }).addTo(stHi);
+    L.polyline(g.lines.map(toLL), { pane: 'stHiPane', color: stCol(g.kind), weight: g.kind === 'precinct' ? 7 : 5, opacity: 1, interactive: false }).addTo(stHi);
+    if (fly) { const mobile = innerWidth < 900; map.flyToBounds(o.b, { paddingTopLeft: [mobile ? 30 : 440, 40], paddingBottomRight: [mobile ? 30 : 460, mobile ? innerHeight * .6 : 40], maxZoom: 16, duration: .6 }); }
+    const a = D.areas.find(x => x.members.includes(g.sub));
+    const R = ranked(), r = a ? R.find(x => x.a.id === a.id) : null;
+    $('#detail').innerHTML = `<div class="d-head"><div>
+      <div class="d-kicker">${esc(g.sub)} · ${g.kind === 'precinct' ? '口碑片区' : '口碑街道'}</div>
+      <h2 class="d-title">${esc(g.name)}</h2>${g.rating ? `<span class="pos">Homely 居民评分 ${g.rating} / 5</span>` : ''}</div>
+      <button class="close" id="dClose" aria-label="关闭"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+      <div class="d-sec"><p>${esc(g.note)}</p><p class="hint">来源：${g.srcs.map(k => `<a href="${ST.src[k][1]}" target="_blank" rel="noopener">${esc(ST.src[k][0])}</a>`).join('、')}</p></div>
+      ${a ? `<div class="d-sec"><h4>所在评分区域</h4><p>${esc(a.name)}：${VN[state.ver]}第 ${r.rank}（${r.s} 分）</p><button class="btn" id="stArea">查看该区域的学校与评分</button></div>` : ''}
+      <div class="d-sec"><h4>看房时留意</h4><p>同一条街也有好坏段：靠近主干道路口、公交线或商业区的一端通常较吵；看北向、地块平整度和临街宽度。</p></div>
+      <p class="warn">签约前必须使用官方 Find my School 按具体门牌地址和目标 enrolment year 核验。居住在学校附近仅改善通勤与教育生态，不构成录取保证；请按学校官网要求提前登记或申请。</p>`;
+    $('#detail').hidden = false; $('#dClose').onclick = () => { stHi.clearLayers(); closeDetail(); };
+    if ($('#stArea')) $('#stArea').onclick = () => { stHi.clearLayers(); selectArea(a.id, true); };
+  }
+  $('#stFit').addEventListener('click', () => {
+    const vis = stObjs.filter(stVisible); if (!vis.length) return;
+    const b = L.latLngBounds(vis.map(o => o.b)); const mobile = innerWidth < 900;
+    map.flyToBounds(b, { paddingTopLeft: [mobile ? 20 : 440, 30], paddingBottomRight: [20, mobile ? innerHeight * .55 : 30], duration: .6 });
+  });
+  $$('.seg[data-name=stsub] button').forEach(b => b.addEventListener('click', () => { state.stsub = b.dataset.v; renderStreets(); }));
+  map.on('zoomend', renderStreets);
+  const _render = render; render = function () { _render(); renderStreets(); };
   const mob = innerWidth < 900;
   map.setView(mob ? [-37.855, 145.06] : [-37.86, 145.02], mob ? 12 : 12);
   map.on('zoomend', () => { document.body.classList.toggle('z-low', map.getZoom() < 13); render(); });
